@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  ddns:
+    build: ./ddns
+    image: ddns:latest
+    restart: always
+    environment:
+    # env should not contain quote or trim space
+    - RUN_AS_DAEMON=TRUE
+    # your record name list, comma as delimiter
+    - RECORD_LIST=blog,vlog,www,@
+    - ACCESS_KEY_ID=<YOUR ALI KEY ID>
+    - ACCESS_KEY_SECRET=<YOUR ALI KEY SECRET>
+    - DOMAIN_NAME=mydomain.net
