@@ -84,7 +84,7 @@ func setDNS(recordID, recordKeyword, ip string) {
 func TrySetDNS(recordKeyword string) {
 	recordID, prevIP, ok := getDNSRecord(recordKeyword)
 	if !ok {
-		return
+		log.WithField("record_name", recordKeyword).Info("setting on new record")
 	}
 
 	ip, err := GetIP()
