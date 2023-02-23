@@ -15,27 +15,31 @@ import (
 
 var client *alidns20150109.Client
 var initClientOnce sync.Once
-var domainName string
 
-func init() {
-	domainName = os.Getenv("DOMAIN_NAME")
-	log.WithField("domain_name", domainName).Info("domain name loaded")
-}
-
+// GetSDKClient
+// usually you should use GetSDKClient only
 func GetSDKClient() *alidns20150109.Client {
 	initClientOnce.Do(func() {
-		config := &openapi.Config{
-			// Protocol:        Ref("http"),
-			AccessKeyId:     utils.Ref(os.Getenv("ACCESS_KEY_ID")),
-			AccessKeySecret: utils.Ref(os.Getenv("ACCESS_KEY_SECRET")),
-		}
-		config.Endpoint = utils.Ref("alidns.cn-shanghai.aliyuncs.com")
-		var err error
-		if client, err = alidns20150109.NewClient(config); err != nil {
-			log.Fatal(err)
-		}
+		ak := os.Getenv("ACCESS_KEY_ID")
+		sk := os.Getenv("ACCESS_KEY_SECRET")
+		MustRebuildClient(ak, sk)
 	})
 	return client
+}
+
+func MustRebuildClient(ak, sk string) {
+	config := &openapi.Config{
+		AccessKeyId:     &ak,
+		AccessKeySecret: &sk,
+	}
+	config.Endpoint = utils.Ref("alidns.cn-shanghai.aliyuncs.com")
+	var err error
+	if client, err = alidns20150109.NewClient(config); err != nil {
+		log.Fatal(err)
+	}
+	
+	// ensure GetSDKClient won't override
+	initClientOnce.Do(func(){})
 }
 
 func GetPrevIP(domainName, recordKeyword, rType string) (recordID, prevIP string, ok bool) {
@@ -102,8 +106,8 @@ func AddDNSRecord(domainName, recordID, recordKeyword, rType, value string) {
 	if _, err := GetSDKClient().AddDomainRecordWithOptions(req, runtime); err != nil {
 		log.WithError(err).Error("failed to add dns")
 	} else {
-		log.WithField("record", recordKeyword).
-			WithField("ip", value).
+		log.WithField("rr", recordKeyword).
+			WithField("value", value).
 			Info("add dns record success")
 	}
 }
@@ -147,6 +151,7 @@ func TrySetDNS(recordKeyword string) {
 		return
 	}
 
+	domainName := os.Getenv("DOMAIN_NAME")
 	updateDNS := SetDNSRecord
 	recordID, prevIP, ok := GetPrevIP(domainName, recordKeyword, "A")
 	if !ok {
