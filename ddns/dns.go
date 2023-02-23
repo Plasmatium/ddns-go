@@ -71,26 +71,49 @@ func setDNS(recordID, recordKeyword, ip string) {
 	}
 	runtime := &util.RuntimeOptions{}
 
-	_, err := client.UpdateDomainRecordWithOptions(req, runtime)
-	if err != nil {
+	if _, err := client.UpdateDomainRecordWithOptions(req, runtime); err != nil {
 		log.WithError(err).Error("failed to set dns")
 	} else {
 		log.WithField("record", recordKeyword).
 			WithField("ip", ip).
 			Info("set dns record success")
+	}	
+}
+func addDNS(recordID, recordKeyword, ip string) {
+	req := &alidns20150109.AddDomainRecordRequest{
+		DomainName: &domainName,
+		RR:       &recordKeyword,
+		Type:     Ref("A"),
+		Value:    &ip,
 	}
+	runtime := &util.RuntimeOptions{}
+
+	if _, err := client.AddDomainRecordWithOptions(req, runtime); err != nil {
+		log.WithError(err).Error("failed to add dns")
+	} else {
+		log.WithField("record", recordKeyword).
+			WithField("ip", ip).
+			Info("add dns record success")
+	}	
 }
 
+// TrySetDNS
+// step 1. find self public ip
+// step 2. get previous ip, if not exist, change updateDNS from setDNS to addDNS
+// step 3. compare previous and target ip, if same, no need to update
+// step 4. do update
 func TrySetDNS(recordKeyword string) {
-	recordID, prevIP, ok := getDNSRecord(recordKeyword)
-	if !ok {
-		log.WithField("record_name", recordKeyword).Info("setting on new record")
-	}
-
 	ip, err := GetIP()
 	if err != nil {
-		log.WithError(err).Error("try set dns failed")
+		log.WithError(err).Error("try set dns failed on get self public ip")
 		return
+	}
+
+	updateDNS := setDNS
+	recordID, prevIP, ok := getDNSRecord(recordKeyword)
+	if !ok {
+		log.WithField("record_name", recordKeyword).Info("previous record not found, setting on new record")
+		updateDNS = addDNS
 	}
 
 	if prevIP == ip {
@@ -99,5 +122,5 @@ func TrySetDNS(recordKeyword string) {
 		return
 	}
 
-	setDNS(recordID, recordKeyword, ip)
+	updateDNS(recordID, recordKeyword, ip)
 }
