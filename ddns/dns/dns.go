@@ -38,19 +38,12 @@ func GetSDKClient() *alidns20150109.Client {
 	return client
 }
 
-func GetDNSRecord(domainName, recordKeyword, rType string) (recordID, prevIP string, ok bool) {
-	req := &alidns20150109.DescribeDomainRecordsRequest{
-		DomainName:  &domainName,
-		RRKeyWord:   utils.Ref(recordKeyword),
-		TypeKeyWord: &rType,
-	}
-	result, err := GetSDKClient().DescribeDomainRecordsWithOptions(req, &util.RuntimeOptions{})
+func GetPrevIP(domainName, recordKeyword, rType string) (recordID, prevIP string, ok bool) {
+	records, err := GetDNSRecords(domainName, recordKeyword, rType)
 	if err != nil {
 		log.WithError(err).Error("get recordID failed")
 		return
 	}
-
-	records := result.Body.DomainRecords.Record
 	if len(records) == 0 {
 		err = fmt.Errorf("records not found")
 		log.WithError(err).
@@ -61,6 +54,22 @@ func GetDNSRecord(domainName, recordKeyword, rType string) (recordID, prevIP str
 	record := records[0]
 
 	return *record.RecordId, *record.Value, true
+}
+
+func GetDNSRecords(domainName, rr, rType string) (records []*alidns20150109.DescribeDomainRecordsResponseBodyDomainRecordsRecord, err error) {
+	req := &alidns20150109.DescribeDomainRecordsRequest{
+		DomainName:  &domainName,
+		RRKeyWord:   utils.Ref(rr),
+		TypeKeyWord: &rType,
+	}
+	result, err := GetSDKClient().DescribeDomainRecordsWithOptions(req, &util.RuntimeOptions{})
+	if err != nil {
+		log.WithError(err).Error("get recordID failed")
+		return
+	}
+
+	records = result.Body.DomainRecords.Record
+	return
 }
 
 func SetDNSRecord(domainName, recordID, recordKeyword, rType, value string) {
@@ -80,6 +89,7 @@ func SetDNSRecord(domainName, recordID, recordKeyword, rType, value string) {
 			Info("set dns record success")
 	}
 }
+
 func AddDNSRecord(domainName, recordID, recordKeyword, rType, value string) {
 	req := &alidns20150109.AddDomainRecordRequest{
 		DomainName: &domainName,
@@ -98,6 +108,33 @@ func AddDNSRecord(domainName, recordID, recordKeyword, rType, value string) {
 	}
 }
 
+func DeleteDNSRecords(recordIDList []string) {
+	if len(recordIDList) == 0 {
+		log.Info("recordIDList is empty, nothing to do")
+		return
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(len(recordIDList))
+
+	for _, rid := range recordIDList {
+		go DeleteDNSRecord(rid)
+		wg.Done()
+	}
+	wg.Wait()
+	log.Info("all records deleted(tried)")
+}
+
+func DeleteDNSRecord(recordID string) {
+	req := &alidns20150109.DeleteDomainRecordRequest{
+		RecordId: &recordID,
+	}
+	runtime := &util.RuntimeOptions{}
+	_, err := client.DeleteDomainRecordWithOptions(req, runtime)
+	if err != nil {
+		log.WithField("record_id", recordID).WithError(err).Error("failed to delete record")
+	}
+}
+
 // TrySetDNS
 // step 1. find self public ip
 // step 2. get previous ip, if not exist, change updateDNS from setDNS to addDNS
@@ -111,7 +148,7 @@ func TrySetDNS(recordKeyword string) {
 	}
 
 	updateDNS := SetDNSRecord
-	recordID, prevIP, ok := GetDNSRecord(domainName, recordKeyword, "A")
+	recordID, prevIP, ok := GetPrevIP(domainName, recordKeyword, "A")
 	if !ok {
 		log.WithField("record_name", recordKeyword).Info("previous record not found, setting on new record")
 		updateDNS = AddDNSRecord

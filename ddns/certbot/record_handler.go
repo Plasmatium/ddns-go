@@ -2,25 +2,18 @@ package certbot
 
 import (
 	"ddns-go/dns"
-	"ddns-go/utils"
-
-	alidns20150109 "github.com/alibabacloud-go/alidns-20150109/v4/client"
-	util "github.com/alibabacloud-go/tea-utils/v2/service"
 )
 
-func addDomainRecord(domainName, txtValue string) {
-	req := &alidns20150109.AddDomainRecordRequest{
-		DomainName: &domainName,
-		RR: utils.Ref("_acme-challenge"),
-		Value: &txtValue,
-		Type: utils.Ref("TXT"),
-	}
-	runtime := &util.RuntimeOptions{}
-	if _, err := dns.GetSDKClient().AddDomainRecordWithOptions(req, runtime); err != nil {
-		log.WithError(err).Error("failed to a")
-	}
+func addChallengeRecord(domainName, txtValue string) {
+	dns.AddDNSRecord(domainName, "", "_acme-challenge", "TXT", txtValue)
 }
 
-func deleteDomainRecord(domainName string) {
-
+func deleteChallengeRecord(domainName string) {
+	records, _ := dns.GetDNSRecords(domainName, "_acme-challenge", "TXT")
+	var ridList []string
+	for _, r := range records {
+		ridList = append(ridList, *r.RecordId)
+	}
+	dns.DeleteDNSRecords(ridList)
 }
+
