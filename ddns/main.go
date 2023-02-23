@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ddns-go/dns"
 	"os"
 	"strings"
 	"time"
@@ -38,7 +39,7 @@ func main() {
 
 func runOnce() {
 	for _, r := range recordList {
-		TrySetDNS(r)
+		dns.TrySetDNS(r)
 	}
 }
 

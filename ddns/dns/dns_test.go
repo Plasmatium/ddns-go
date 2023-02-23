@@ -1,4 +1,4 @@
-package main
+package dns
 
 import (
 	"fmt"
@@ -7,6 +7,5 @@ import (
 
 func TestGetDNSRecords(*testing.T) {
 	domainName = "yucy-top.love"
-	fmt.Println(getDNSRecord("@"))
+	fmt.Println(GetDNSRecord(domainName, "@"))
 }
-

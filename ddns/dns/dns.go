@@ -1,9 +1,11 @@
-package main
+package dns
 
 import (
 	"fmt"
 	"os"
 	"sync"
+
+	"ddns-go/utils"
 
 	alidns20150109 "github.com/alibabacloud-go/alidns-20150109/v4/client"
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
@@ -16,19 +18,18 @@ var initClientOnce sync.Once
 var domainName string
 
 func init() {
-	client = mustCreateClient()
 	domainName = os.Getenv("DOMAIN_NAME")
 	log.WithField("domain_name", domainName).Info("domain name loaded")
 }
 
-func mustCreateClient() *alidns20150109.Client {
+func GetSDKClient() *alidns20150109.Client {
 	initClientOnce.Do(func() {
 		config := &openapi.Config{
 			// Protocol:        Ref("http"),
-			AccessKeyId:     Ref(os.Getenv("ACCESS_KEY_ID")),
-			AccessKeySecret: Ref(os.Getenv("ACCESS_KEY_SECRET")),
+			AccessKeyId:     utils.Ref(os.Getenv("ACCESS_KEY_ID")),
+			AccessKeySecret: utils.Ref(os.Getenv("ACCESS_KEY_SECRET")),
 		}
-		config.Endpoint = Ref("alidns.cn-shanghai.aliyuncs.com")
+		config.Endpoint = utils.Ref("alidns.cn-shanghai.aliyuncs.com")
 		var err error
 		if client, err = alidns20150109.NewClient(config); err != nil {
 			log.Fatal(err)
@@ -37,13 +38,13 @@ func mustCreateClient() *alidns20150109.Client {
 	return client
 }
 
-func getDNSRecord(recordKeyword string) (recordID, prevIP string, ok bool) {
+func GetDNSRecord(domainName, recordKeyword, rType string) (recordID, prevIP string, ok bool) {
 	req := &alidns20150109.DescribeDomainRecordsRequest{
 		DomainName:  &domainName,
-		RRKeyWord:   Ref(recordKeyword),
-		TypeKeyWord: Ref("A"),
+		RRKeyWord:   utils.Ref(recordKeyword),
+		TypeKeyWord: &rType,
 	}
-	result, err := client.DescribeDomainRecordsWithOptions(req, &util.RuntimeOptions{})
+	result, err := GetSDKClient().DescribeDomainRecordsWithOptions(req, &util.RuntimeOptions{})
 	if err != nil {
 		log.WithError(err).Error("get recordID failed")
 		return
@@ -62,39 +63,39 @@ func getDNSRecord(recordKeyword string) (recordID, prevIP string, ok bool) {
 	return *record.RecordId, *record.Value, true
 }
 
-func setDNS(recordID, recordKeyword, ip string) {
+func SetDNSRecord(domainName, recordID, recordKeyword, rType, value string) {
 	req := &alidns20150109.UpdateDomainRecordRequest{
 		RecordId: &recordID,
 		RR:       &recordKeyword,
-		Type:     Ref("A"),
-		Value:    &ip,
+		Type:     &rType,
+		Value:    &value,
 	}
 	runtime := &util.RuntimeOptions{}
 
-	if _, err := client.UpdateDomainRecordWithOptions(req, runtime); err != nil {
+	if _, err := GetSDKClient().UpdateDomainRecordWithOptions(req, runtime); err != nil {
 		log.WithError(err).Error("failed to set dns")
 	} else {
 		log.WithField("record", recordKeyword).
-			WithField("ip", ip).
+			WithField("ip", value).
 			Info("set dns record success")
-	}	
+	}
 }
-func addDNS(recordID, recordKeyword, ip string) {
+func AddDNSRecord(domainName, recordID, recordKeyword, rType, value string) {
 	req := &alidns20150109.AddDomainRecordRequest{
 		DomainName: &domainName,
-		RR:       &recordKeyword,
-		Type:     Ref("A"),
-		Value:    &ip,
+		RR:         &recordKeyword,
+		Type:       &rType,
+		Value:      &value,
 	}
 	runtime := &util.RuntimeOptions{}
 
-	if _, err := client.AddDomainRecordWithOptions(req, runtime); err != nil {
+	if _, err := GetSDKClient().AddDomainRecordWithOptions(req, runtime); err != nil {
 		log.WithError(err).Error("failed to add dns")
 	} else {
 		log.WithField("record", recordKeyword).
-			WithField("ip", ip).
+			WithField("ip", value).
 			Info("add dns record success")
-	}	
+	}
 }
 
 // TrySetDNS
@@ -103,17 +104,17 @@ func addDNS(recordID, recordKeyword, ip string) {
 // step 3. compare previous and target ip, if same, no need to update
 // step 4. do update
 func TrySetDNS(recordKeyword string) {
-	ip, err := GetIP()
+	ip, err := utils.GetIP()
 	if err != nil {
 		log.WithError(err).Error("try set dns failed on get self public ip")
 		return
 	}
 
-	updateDNS := setDNS
-	recordID, prevIP, ok := getDNSRecord(recordKeyword)
+	updateDNS := SetDNSRecord
+	recordID, prevIP, ok := GetDNSRecord(domainName, recordKeyword, "A")
 	if !ok {
 		log.WithField("record_name", recordKeyword).Info("previous record not found, setting on new record")
-		updateDNS = addDNS
+		updateDNS = AddDNSRecord
 	}
 
 	if prevIP == ip {
@@ -122,5 +123,5 @@ func TrySetDNS(recordKeyword string) {
 		return
 	}
 
-	updateDNS(recordID, recordKeyword, ip)
+	updateDNS(domainName, recordID, recordKeyword, "A", ip)
 }
