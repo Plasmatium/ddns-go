@@ -12,14 +12,20 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func init() {
+	log.SetReportCaller(true)
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+}
+
 func main() {
 	// 操作类型，authenticator: 域名认证，添加 DNS TXT 记录; cleanup: 认证通过后，删除此 DNS TXT 记录
 	op := flag.String("o", "auth", "Operate: authenticator or cleanup")
-	confFile := flag.String("c", "authenticates.json", "Config file path")
+	confFile := flag.String("c", "credential.json", "Config file path")
 	
 	help := flag.Bool("h", false, "show help infomation")
 	flag.Parse()
-
 	if *help {
 		flag.Usage()
 		os.Exit(0)
@@ -31,13 +37,12 @@ func main() {
 		log.Warn("domain is empty, please ensure called by certbot, nothing to do")
 		return
 	}
+	log := log.WithField("domain", domain)
 
 	loadConfig(*confFile)
 
 	switch *op {
 	case "auth":
-		log.Info("doing auth now, try deleting old records first")
-		certbot.DeleteChallengeRecord(domain)
 		log.Info("adding txt record")
 		certbot.AddChallengeRecord(domain, validation)
 		time.Sleep(time.Second * 30)
@@ -54,6 +59,8 @@ type authInfo struct {
 }
 
 func loadConfig(confFilePath string) {
+	log := log.WithField("path", confFilePath)
+	log.Info("try loading conf file")
 	bs, err := ioutil.ReadFile(confFilePath)
 	if err != nil {
 		log.WithError(err).WithField("path", confFilePath).Panic("failed to load config file")

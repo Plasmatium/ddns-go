@@ -1,0 +1,11 @@
+sudo certbot certonly \
+  --non-interactive \
+  --email <your_email.example.com> \
+  --agree-tos \
+  --manual-public-ip-logging-ok \
+  --manual --preferred-challenges dns-01 \
+  --manual-auth-hook "dist/certmgr -o auth" \
+  --manual-cleanup-hook "dist/certmgr -o cleanup" \
+  -d <your.domain.list> \
+  -d <*.another_domain.list> \
+  --server https://acme-v02.api.letsencrypt.org/directory

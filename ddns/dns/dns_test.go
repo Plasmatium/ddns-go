@@ -6,6 +6,6 @@ import (
 )
 
 func TestGetDNSRecords(*testing.T) {
-	domainName = "yucy-top.love"
+	domainName := "yucy-top.love"
 	fmt.Println(GetPrevIP(domainName, "@", "A"))
 }
