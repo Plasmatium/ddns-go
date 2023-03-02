@@ -49,5 +49,6 @@ func GetIP() (ip string, err error) {
 			break
 		}
 	}
+	log.WithField("public_ip", ip).Info("get public ip success")
 	return
 }

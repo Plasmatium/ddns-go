@@ -39,7 +39,7 @@ func MustRebuildClient(ak, sk string) {
 	}
 	
 	// ensure GetSDKClient won't override
-	initClientOnce.Do(func(){})
+	go initClientOnce.Do(func(){})
 }
 
 func GetPrevIP(domainName, recordKeyword, rType string) (recordID, prevIP string, ok bool) {
@@ -56,6 +56,7 @@ func GetPrevIP(domainName, recordKeyword, rType string) (recordID, prevIP string
 		return
 	}
 	record := records[0]
+	log.WithField("record", record).Info("fetched prefious record")
 
 	return *record.RecordId, *record.Value, true
 }
